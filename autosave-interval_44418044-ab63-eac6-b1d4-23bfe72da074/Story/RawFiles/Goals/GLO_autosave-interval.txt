@@ -1,0 +1,125 @@
+Version 1
+SubGoalCombiner SGC_AND
+INITSECTION
+// DB_AUTOSAVE_WAITFOR("combat");
+// DB_AUTOSAVE_WAITFOR("dialog");
+DB_AUTOSAVE_WAITFOR("");
+KBSECTION
+/*
+Hello, feel free to take, adjust and redistribute this mod! If you want to change the interval length, you can do that below.
+
+I learned to make this our of pure fury and hatred after losing a combind total of over 10h of playtime re-doing things I already did,
+because whenever the game gets good I forget to compulsivly quick-save ever 5min.
+After the game once crashed and I lost 2h of progress I refused to continue playing the game until I had a mod that autosaves regularly. I had a save-on-combat mod installed, but that wasn't eough, especially in Act3.
+I spent 8h trying to get a mod that saves regularly from the nexus installed on my steamdeck, but I could not get BG3SE & it's other dependencies working.
+So I tried to get a mod like this commissioned, but all I got was bots, someone who wanted 350$ to make it, and a few people who stopped responding.
+
+Fuck you Larian Studios! How dare you make an amazing game, but then have basically no autosave?!
+This should be a standard feature, I should not have had to spend 25h learning osiris & making this a mod.
+At least I can continue to play the game now...
+*/
+
+/* Debugging
+IF TextEvent("autosave")
+AND TimerExists("AUTOSAVE_INTERVAL", _Exists)
+AND GetHostCharacter(_Player)
+AND IntegerToString(_Exists, _ExistsStr)
+AND Concatenate("Autosave interval state: ", _ExistsStr, _Str)
+THEN
+DebugText(_Player, _Str);
+
+IF TextEvent("autosave0")
+THEN
+DB_AUTOSAVE_WAITFOR("combat");
+
+IF TextEvent("autosave1")
+THEN
+NOT DB_AUTOSAVE_WAITFOR("combat");
+*/
+
+PROC
+PROC_StartTimer()
+THEN
+TimerCancel("AUTOSAVE_INTERVAL"); // Cancel in case it's started for whatever reason
+TimerLaunch("AUTOSAVE_INTERVAL", 60000); // 10min
+
+PROC
+PROC_AutosaveAndTimer()
+AND GetHostCharacter(_Player)
+THEN
+AutoSave();
+// DebugText(_Player, "AutoSave Trigger");
+PROC_StartTimer();
+
+// set in combat
+IF CombatStarted(_)
+AND GetHostCharacter(_Player)
+THEN
+// DebugText(_Player, "wait for combat set");
+DB_AUTOSAVE_WAITFOR("combat");
+
+// save after combat if no timer
+IF CombatEnded(_)
+AND TimerExists("AUTOSAVE_INTERVAL", _Exists)
+AND _Exists == 0
+AND DB_AUTOSAVE_WAITFOR(_Key)
+AND _Key == "combat"
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "C: saving & restart timer");
+PROC_AutosaveAndTimer();
+
+// unset in combat
+IF CombatEnded(_)
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "wait for combat dropped");
+NOT DB_AUTOSAVE_WAITFOR("combat");
+
+// set in dialog
+IF DialogStarted(_, _)
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "wait for dialog set");
+DB_AUTOSAVE_WAITFOR("dialog");
+
+// save after dialog if no timer
+IF DialogEnded(_, _)
+AND TimerExists("AUTOSAVE_INTERVAL", _Exists)
+AND _Exists == 0
+AND DB_AUTOSAVE_WAITFOR(_Key)
+AND _Key == "dialog"
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "D: saving & restart timer");
+PROC_AutosaveAndTimer();
+
+// unset in dialog
+IF DialogEnded(_, _)
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "wait for dialog dropped");
+NOT DB_AUTOSAVE_WAITFOR("dialog");
+
+// init timer on start
+// IF CharacterMadePlayer(_)
+IF SavegameLoaded()
+AND TimerExists("AUTOSAVE_INTERVAL", _Exists)
+AND _Exists == 0
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+ShowNotification(_Player, "Autosave Timer Enabled");
+PROC_StartTimer();
+
+// save & restart timer
+IF TimerFinished("AUTOSAVE_INTERVAL")
+AND SysCount("DB_AUTOSAVE_WAITFOR", 1, _NumEntries)
+AND _NumEntries < 2
+AND GetHostCharacter((CHARACTER)_Player)
+THEN
+// DebugText(_Player, "will autosave");
+PROC_AutosaveAndTimer();
+
+EXITSECTION
+
+ENDEXITSECTION
